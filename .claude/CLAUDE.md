@@ -4,7 +4,9 @@ Minimal repro for a Vimeo player regression, hosted on GitHub Pages.
 
 ## The bug
 
-On iOS WebKit (all versions tested: 16, 18, 26.6.1), calling `player.play()` via the `@vimeo/player` SDK without a live user gesture makes the Vimeo iframe player mute itself and start playing. Before Vimeo player build 4.46.68 (first seen 6 July 2026) the call simply failed and the video stayed paused and unmuted. Desktop Safari and Chromium are unaffected.
+On iOS WebKit (all versions tested: 16, 18, 26.6.1), calling `player.play()` via the `@vimeo/player` SDK without a live user gesture makes the Vimeo iframe player mute itself and start playing. Before Vimeo player build 4.46.68 (first seen 6 July 2026) the call simply failed and the video stayed paused and unmuted.
+
+Not iOS-specific. The player mutes whenever the browser rejects audible `play()` without a gesture. iOS always rejects. Desktop Safari and Chromium reject only when the page has no sticky user activation and the site has no autoplay allowance (Chromium Media Engagement Index, Safari per-site setting), so desktop results vary between runs. The iframe carries `allow="autoplay"`, so it inherits the parent page's permission.
 
 ## Constraints
 
