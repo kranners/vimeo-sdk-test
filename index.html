@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vimeo SDK play() repro</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 12px; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: #111; color: #eee; }
+    h1 { font-size: 16px; margin: 0 0 8px; }
+    p { margin: 0 0 8px; color: #aaa; }
+    #player { width: 100%; aspect-ratio: 16 / 9; background: #000; }
+    #player iframe { width: 100%; height: 100%; border: 0; }
+    #log { margin-top: 10px; font: 12px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+    .ok { color: #7c7; } .bad { color: #f77; } .dim { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Vimeo SDK: play() without a user gesture</h1>
+  <p>Loads @vimeo/player from a CDN, waits for <code>ready</code>, then calls <code>play()</code> from a <code>setTimeout</code>. No gesture, no autoplay parameter. Read the Vimeo player build from the iframe's network requests and note it by hand.</p>
+  <div id="player"></div>
+  <div id="log"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@vimeo/player@2.30.4/dist/player.min.js"></script>
+  <script src="repro.js"></script>
+</body>
+</html>
