@@ -1,8 +1,8 @@
 (function () {
-  var SDK_VERSION = "2.30.4"; // matches the pinned CDN script in index.html
-  var VIDEO_ID = 43652787; // public video from Vimeo's own docs
+  var ORIGIN = "https://player.vimeo.com";
   var DELAY_MS = 2000;
 
+  var iframe = document.getElementById("player");
   var logEl = document.getElementById("log");
   function log(msg, cls) {
     var line = document.createElement("div");
@@ -12,18 +12,69 @@
     console.log(msg);
   }
 
-  log("SDK @vimeo/player " + SDK_VERSION);
+  log("No SDK. Raw postMessage to " + ORIGIN);
   log("UA " + navigator.userAgent, "dim");
   log("Player build: record by hand from iframe requests", "dim");
   log("Do not click or tap this page until the verdict appears.", "dim");
 
-  var player = new Vimeo.Player("player", { id: VIDEO_ID });
+  // Minimal client for the Vimeo player postMessage protocol, mirroring what
+  // @vimeo/player does internally:
+  //   parent -> iframe  { method: "play" }
+  //   iframe -> parent  { method: "getMuted", value: true }
+  //   iframe -> parent  { event: "error", data: { method, name, message } }
+  //   iframe -> parent  { event: "ready" }
+  var pending = {};
+  var readyResolve;
+  var ready = new Promise(function (resolve) {
+    readyResolve = resolve;
+  });
+
+  window.addEventListener("message", function (e) {
+    if (e.origin !== ORIGIN || e.source !== iframe.contentWindow) return;
+    var data = e.data;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch (err) {
+        return;
+      }
+    }
+    if (!data) return;
+    if (data.event === "ready" || data.method === "ping") {
+      readyResolve();
+      return;
+    }
+    if (data.event === "error" && data.data && pending[data.data.method]) {
+      var err = new Error(data.data.message);
+      err.name = data.data.name;
+      pending[data.data.method].shift().reject(err);
+      return;
+    }
+    if (data.method && pending[data.method] && pending[data.method].length) {
+      pending[data.method].shift().resolve(data.value);
+    }
+  });
+
+  function call(method) {
+    return ready.then(function () {
+      return new Promise(function (resolve, reject) {
+        (pending[method] = pending[method] || []).push({
+          resolve: resolve,
+          reject: reject,
+        });
+        iframe.contentWindow.postMessage({ method: method }, ORIGIN);
+      });
+    });
+  }
+
+  // In case the player finished loading before our listener attached.
+  iframe.contentWindow.postMessage({ method: "ping" }, ORIGIN);
 
   function snapshot(label) {
     return Promise.all([
-      player.getMuted(),
-      player.getVolume(),
-      player.getPaused(),
+      call("getMuted"),
+      call("getVolume"),
+      call("getPaused"),
     ]).then(function (r) {
       log(label + " muted=" + r[0] + " volume=" + r[1] + " paused=" + r[2]);
       return r;
@@ -80,8 +131,7 @@
     );
   }
 
-  player
-    .ready()
+  ready
     .then(function () {
       log("ready");
       return snapshot("before");
@@ -94,16 +144,16 @@
           .then(function (b) {
             blocked = b;
             log("browser blocks audible autoplay on this page: " + b, "dim");
-            log("calling play() from setTimeout, no gesture");
-            return player.play();
+            log('posting { method: "play" } from setTimeout, no gesture');
+            return call("play");
           })
           .then(
             function () {
-              log("play() resolved", "ok");
+              log("play resolved", "ok");
             },
             function (err) {
               log(
-                "play() rejected: " +
+                "play rejected: " +
                   (err && err.name) +
                   " " +
                   (err && err.message),
@@ -128,8 +178,5 @@
             else log("played unmuted without a gesture", "ok");
           });
       }, DELAY_MS);
-    })
-    .catch(function (err) {
-      log("ready failed: " + err, "bad");
     });
 })();
